@@ -1,17 +1,18 @@
 #![no_std]
 #![no_main]
 
-use defmt::{debug, error};
+use embassy_time::Timer;
+use defmt::{debug, error, info};
 #[allow(unused_imports)]
 use {defmt_rtt as _, panic_probe as _};
 use embassy_executor::Spawner;
 use embassy_rp::bind_interrupts;
 use embassy_rp::peripherals::UART0;
-use embassy_time::Timer;
-use embassy_rp::uart::{BufferedInterruptHandler, BufferedUart, Config};
+use embassy_rp::uart::{BufferedInterruptHandler, BufferedUart, Config, Error};
 use embedded_io_async::{Read, Write};
+use heapless::{String, Vec};
 use static_cell::StaticCell;
-use mt3339::MT3339;
+use mt3339::{MT3339Error, MT3339};
 
 bind_interrupts!(struct Irqs {
     UART0_IRQ => BufferedInterruptHandler<UART0>;
@@ -31,18 +32,12 @@ async fn main(_spawner: Spawner) {
     let uart = BufferedUart::new(uart, tx_pin, rx_pin, Irqs, tx_buf, rx_buf, config);
 
     let mut gps = MT3339::new(uart);
-
     // Turn on the basic GGA and RMC info (what you typically want)
     gps.send_cmd("PMTK314,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0".as_bytes()).await.unwrap();
     // Set update rate to once a second (1hz) which is what you typically want.
     gps.send_cmd("PMTK220,1000".as_bytes()).await.unwrap();
 
     loop {
-        debug!("looping...");
-        // match gps.update().await {
-        //     Ok(_) => {}
-        //     Err(e) => error!("error: {}", e)
-        // }
-        Timer::after_secs(3).await;
+        gps.read_sentence().await.unwrap();
     }
 }
