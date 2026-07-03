@@ -1,9 +1,12 @@
 #![no_std]
+extern crate alloc;
 
-use core::str::{from_utf8, Utf8Error};
+mod pmtk;
+
+use core::str::from_utf8;
 use defmt::{debug, error, info, Format};
 use embedded_io_async::{ErrorType, Read, Write};
-use heapless::{format, String};
+use heapless::format;
 
 const PREAMBLE: u8 = 0x24; // &, 36
 const DATA_FIELD_TERMINATOR: u8 = 0x2a; // *, 42
@@ -64,6 +67,7 @@ impl<UART: Read + Write + ErrorType> MT3339<UART> {
                                     info!("msg: {:?}", msg);
                                     self.buf = [0; 255];
                                     self.buf_idx = 0;
+                                    // TODO return Some(Cmd)
                                 }
                                 Err(_) => {
                                     error!("failed to convert buffer to utf8 :(")
@@ -90,8 +94,11 @@ pub(crate) fn checksum(data: &[u8]) -> [u8; 2] {
     for c in data {
         checksum ^= *c;
     }
+    info!("checksum: {:?}", checksum);
+    info!("checksum: {:x}", checksum);
     // TODO find way to avoid String alloc?
-    let msg: String<2> = format!(2; "{:X?}", checksum).unwrap();
+    let msg = format!(2; "{:X?}", checksum).unwrap();
+    info!("msg: {}\r\n", msg.as_str());
     msg.into_bytes().into_array().unwrap()
 }
 
@@ -101,7 +108,7 @@ mod tests {
 
     #[test]
     fn checksum_nmea_out() {
-        assert_eq!(checksum("PMTK314,1,1,1,1,1,5,0,0,0,0,0,0,0,0,0,0,0,0,0".as_bytes()), [0x31, 0x39]);
+        assert_eq!(checksum("PMTK314,1,1,1,1,1,5,0,0,0,0,0,0,0,0,0,0,0,0,0".as_bytes()), [0x32, 0x43]);
     }
 
     #[test]

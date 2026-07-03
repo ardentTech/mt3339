@@ -1,35 +1,79 @@
-//     const CR_LF: [u8; 2] = [0x0d, 0x0a]; // \r\n
-//     const PREAMBLE: u8 = 0x24; // $
-//     const TALKER_ID: [u8; 4] = [0x50, 0x4d, 0x54, 0x4b]; // PMTK
-//     const TERMINATOR: u8 = 0x2a; // *
+use core::fmt::{Display, Formatter};
+use heapless::{format, String};
+
+const PACKET_LEN: usize = 255;
+
+enum FrequencySetting {
+    Disabled = 0x0,
+    OnePositionFix = 0x1,
+    TwoPositionFix = 0x2,
+    ThreePositionFix = 0x3,
+}
+
+struct SetNmeaOutput {
+    gll: FrequencySetting
+    // TODO add remaining 18
+}
+
+impl Into<DataField> for SetNmeaOutput {
+    fn into(self) -> DataField {
+        DataField([self.gll as u8])
+    }
+}
+
+struct DataField([u8; 1]); // TODO 1 becomes 19
+impl Display for DataField {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        for c in self.0 {
+            write!(f, ",{}", c)?;
+        }
+        Ok(())
+    }
+}
+
+struct PktType([u8; 3]);
+impl Display for PktType {
+    // "314" should be [0x33, 0x31, 0x34], or [51, 49, 52]
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}{}{}", self.0[0] as char, self.0[1] as char, self.0[2] as char)
+    }
+}
+
+// struct Command {
+//     checksum: u8,
+//     data_field: DataField,
+//     pkt_type: PktType
+// }
 //
-//     fn checksum(&self, data: &[u8]) -> u16 {
-//         let mut checksum = 016;
-//         for c in data {
-//             checksum ^= *c as u16;
-//         }
-//         checksum
+// impl Into<String<PACKET_LEN>> for Command {
+//     fn into(self) -> String<PACKET_LEN> {
+//         format!("$PMTK{}{}*<checksum>\r\n", self.pkt_type, self.data_field).unwrap()
 //     }
-//
-//     fn encode(&self) -> [u8; LEN] {
-//         // $PMTK314,1,1,1,1,1,5,0,0,0,0,0,0,0,0,0,0,0,0,0*2C<CR><LF>
-//         let mut res = [0u8; LEN];
-//         res[0] = Self::PREAMBLE;
-//         for (i, v) in Self::TALKER_ID.iter().enumerate() {
-//             res[i + 1usize] = *v;
-//         }
-//         for (i, v) in self.pkt_type().iter().enumerate() {
-//             res[i + 5usize] = *v;
-//         }
-//         for (i, v) in self.data_fields().iter().enumerate() {
-//             res[i + 8usize] = 0x2c; // comma
-//             res[i + 9usize] = *v;
-//         }
-//         res[LEN - 5] = Self::TERMINATOR;
-//         let checksum = self.checksum(&self.data_fields());
-//         res[LEN - 4] = (checksum >> 8) as u8;
-//         res[LEN - 3] = (checksum & 0xff) as u8;
-//         res[LEN - 2] = 0x0d;
-//         res[LEN - 1] = 0x0a;
-//         res
-//     }
+// }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pkt_type_display_ok() {
+        let pkt_type = PktType([0x33, 0x31, 0x34]);
+        let res = format!(3; "{}", pkt_type).unwrap();
+        assert_eq!(res, "314");
+    }
+
+    #[test]
+    fn set_nmea_output_ok() {
+        let data = SetNmeaOutput { gll: FrequencySetting::OnePositionFix };
+        let df: DataField = data.into();
+        assert_eq!(df.0, [0x1])
+    }
+
+    #[test]
+    fn data_field_display_ok() {
+        let data = SetNmeaOutput { gll: FrequencySetting::OnePositionFix };
+        let df: DataField = data.into();
+        let res = format!(2; "{}", df).unwrap();
+        assert_eq!(res, ",1");
+    }
+}
