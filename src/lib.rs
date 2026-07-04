@@ -94,11 +94,7 @@ pub(crate) fn checksum(data: &[u8]) -> [u8; 2] {
     for c in data {
         checksum ^= *c;
     }
-    info!("checksum: {:?}", checksum);
-    info!("checksum: {:x}", checksum);
-    // TODO find way to avoid String alloc?
     let msg = format!(2; "{:X?}", checksum).unwrap();
-    info!("msg: {}\r\n", msg.as_str());
     msg.into_bytes().into_array().unwrap()
 }
 
