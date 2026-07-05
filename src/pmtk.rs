@@ -1,7 +1,16 @@
 use core::fmt::{Display, Formatter};
 use heapless::{format, String};
+use crate::pmtk::PmtkError::InvalidInput;
+
+#[derive(Debug)]
+pub enum PmtkError {
+    InvalidInput
+}
 
 const SET_NMEA_UPDATE_RATE: u16 = 220;
+const SET_NMEA_UPDATE_RATE_MIN: u16 = 100;
+const SET_NMEA_UPDATE_RATE_MAX: u16 = 10000;
+
 const SET_NMEA_OUTPUT: u16 = 314;
 
 struct NmeaPacket<const N: usize> {
@@ -12,7 +21,7 @@ impl<const N: usize> Display for NmeaPacket<N> {
         // TODO can capacity be calculated dynamically? just set to 255?
         let cmd: String<51> = format!("{}", self.pmtk_command)?;
         let checksum = generate_checksum(cmd.as_bytes());
-        write!(f, "${}*{}{}\r\n", cmd, checksum[0] as char, checksum[1] as char)
+        write!(f, "${}*{:X?}\r\n", cmd, checksum)
     }
 }
 
@@ -31,14 +40,25 @@ impl<const N: usize> Display for PmtkCommand<N> {
 }
 
 // "PMTK220,1000"
+
 #[derive(Debug, Default)]
-pub struct SetNmeaUpdateRate {
-    ms: u16 // TODO between 100 and 10000
+pub struct SetNmeaUpdateRate(pub(crate) u16);
+impl SetNmeaUpdateRate {
+    pub fn new(ms: u16) -> Result<Self, PmtkError> {
+        if !Self::validate(ms) {
+            return Err(InvalidInput)
+        }
+        Ok(Self(ms))
+    }
+
+    fn validate(ms: u16) -> bool {
+        SET_NMEA_UPDATE_RATE_MIN < ms && ms < SET_NMEA_UPDATE_RATE_MAX
+    }
 }
 impl Into<PmtkCommand<1>> for SetNmeaUpdateRate {
     fn into(self) -> PmtkCommand<1> {
         PmtkCommand {
-            data_fields: [self.ms],
+            data_fields: [self.0],
             pkt_type: SET_NMEA_UPDATE_RATE
         }
     }
@@ -75,15 +95,10 @@ impl Into<PmtkCommand<19>> for SetNmeaOutput {
     }
 }
 
-fn generate_checksum(data: &[u8]) -> [u8; 2] {
-    let mut checksum = 0;
-    for c in data {
-        checksum ^= *c;
-    }
-    let msg = format!(2; "{:X?}", checksum).unwrap();
-    msg.into_bytes().into_array().unwrap()
+fn generate_checksum(data: &[u8]) -> u8 {
+    data.iter().fold(0, |acc, &x| acc ^ x)
 }
-//
+
 #[derive(Debug, Default)]
 enum FrequencySetting {
     #[default]
@@ -100,6 +115,11 @@ mod tests {
     use super::*;
 
     #[test]
+    fn generate_checksum_ok() {
+        assert_eq!(generate_checksum("PMTK314,1,1,1,1,1,5,0,0,0,0,0,0,0,0,0,0,0,0,0".as_bytes()), 0x2c);
+    }
+
+    #[test]
     fn set_nmea_output_display_ok() {
         let mut data = SetNmeaOutput::default();
         data.gll = FrequencySetting::OnePositionFix;
@@ -114,8 +134,24 @@ mod tests {
     }
 
     #[test]
+    fn set_nmea_update_rate_invalid_low() {
+        match SetNmeaUpdateRate::new(SET_NMEA_UPDATE_RATE_MIN - 1) {
+            Ok(_) => panic!(),
+            Err(_) => {}
+        }
+    }
+
+    #[test]
+    fn set_nmea_update_rate_invalid_high() {
+        match SetNmeaUpdateRate::new(SET_NMEA_UPDATE_RATE_MAX + 1) {
+            Ok(_) => panic!(),
+            Err(_) => {}
+        }
+    }
+
+    #[test]
     fn set_nmea_update_rate_display_ok() {
-        let data = SetNmeaUpdateRate { ms: 1000 };
+        let data = SetNmeaUpdateRate::new(1000).unwrap();
         let pmtk_command: PmtkCommand<1> = data.into();
         let res = format!(15; "{}", pmtk_command).unwrap();
         assert_eq!(res, "PMTK220,1000");
