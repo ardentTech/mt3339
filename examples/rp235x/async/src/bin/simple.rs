@@ -13,6 +13,7 @@ use embedded_io_async::{Read, Write};
 use heapless::{String, Vec};
 use static_cell::StaticCell;
 use mt3339::{MT3339Error, MT3339};
+use mt3339::pmtk::{FrequencySetting, SetNmeaOutput, SetNmeaUpdateRate};
 
 bind_interrupts!(struct Irqs {
     UART0_IRQ => BufferedInterruptHandler<UART0>;
@@ -32,10 +33,21 @@ async fn main(_spawner: Spawner) {
     let uart = BufferedUart::new(uart, tx_pin, rx_pin, Irqs, tx_buf, rx_buf, config);
 
     let mut gps = MT3339::new(uart);
+
+    let mut cmd = SetNmeaOutput::default();
+    cmd.gll = FrequencySetting::OnePositionFix;
+    cmd.rmc = FrequencySetting::OnePositionFix;
+    cmd.vtg = FrequencySetting::OnePositionFix;
+    cmd.gga = FrequencySetting::OnePositionFix;
+    cmd.gsa = FrequencySetting::OnePositionFix;
+    cmd.gsv = FrequencySetting::FivePositionFixes;
+    gps.send_cmd(cmd).await.ok();
     // Turn on the basic GGA and RMC info (what you typically want)
-    gps.send_cmd("PMTK314,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0".as_bytes()).await.unwrap();
+    //gps.send_cmd("PMTK314,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0".as_bytes()).await.unwrap();
     // Set update rate to once a second (1hz) which is what you typically want.
-    gps.send_cmd("PMTK220,1000".as_bytes()).await.unwrap();
+    let cmd = SetNmeaUpdateRate::new(1000).unwrap();
+    gps.send_cmd(cmd).await.ok();
+    //gps.send_cmd("PMTK220,1000".as_bytes()).await.unwrap();
 
     loop {
         gps.read_sentence().await.unwrap();

@@ -1,4 +1,5 @@
 use core::fmt::{Display, Formatter};
+use defmt::Format;
 use heapless::{format, String};
 use crate::pmtk::PmtkError::InvalidInput;
 
@@ -13,8 +14,8 @@ const SET_NMEA_UPDATE_RATE_MAX: u16 = 10000;
 
 const SET_NMEA_OUTPUT: u16 = 314;
 
-struct NmeaPacket<const N: usize> {
-    pmtk_command: PmtkCommand<N>
+pub struct NmeaPacket<const N: usize> {
+    pub(crate) pmtk_command: PmtkCommand<N>
 }
 impl<const N: usize> Display for NmeaPacket<N> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
@@ -25,7 +26,8 @@ impl<const N: usize> Display for NmeaPacket<N> {
     }
 }
 
-struct PmtkCommand<const N: usize> {
+#[derive(Debug)]
+pub struct PmtkCommand<const N: usize> {
     data_fields: [u16; N],
     pkt_type: u16
 }
@@ -39,9 +41,7 @@ impl<const N: usize> Display for PmtkCommand<N> {
     }
 }
 
-// "PMTK220,1000"
-
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Format)]
 pub struct SetNmeaUpdateRate(pub(crate) u16);
 impl SetNmeaUpdateRate {
     pub fn new(ms: u16) -> Result<Self, PmtkError> {
@@ -65,16 +65,16 @@ impl Into<PmtkCommand<1>> for SetNmeaUpdateRate {
 }
 
 // TODO builder pattern?
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Format)]
 pub struct SetNmeaOutput {
-    gll: FrequencySetting,
-    rmc: FrequencySetting,
-    vtg: FrequencySetting,
-    gga: FrequencySetting,
-    gsa: FrequencySetting,
-    gsv: FrequencySetting,
-    zda: FrequencySetting,
-    mchn: FrequencySetting,
+    pub gll: FrequencySetting,
+    pub rmc: FrequencySetting,
+    pub vtg: FrequencySetting,
+    pub gga: FrequencySetting,
+    pub gsa: FrequencySetting,
+    pub gsv: FrequencySetting,
+    pub zda: FrequencySetting,
+    pub mchn: FrequencySetting,
 }
 impl Into<PmtkCommand<19>> for SetNmeaOutput {
     fn into(self) -> PmtkCommand<19> {
@@ -94,13 +94,14 @@ impl Into<PmtkCommand<19>> for SetNmeaOutput {
         }
     }
 }
+// TODO fn new
 
-fn generate_checksum(data: &[u8]) -> u8 {
+pub(crate) fn generate_checksum(data: &[u8]) -> u8 {
     data.iter().fold(0, |acc, &x| acc ^ x)
 }
 
-#[derive(Debug, Default)]
-enum FrequencySetting {
+#[derive(Debug, Default, Format)]
+pub enum FrequencySetting {
     #[default]
     Disabled = 0x0,
     OnePositionFix = 0x1,
