@@ -6,6 +6,7 @@ use core::str::from_utf8;
 use defmt::{debug, error, info, Format};
 use embedded_io_async::{ErrorType, Read, Write};
 use heapless::format;
+use nmea::Nmea;
 use crate::pmtk::{generate_checksum, NmeaPacket, PmtkCommand};
 
 const PREAMBLE: u8 = 0x24; // &, 36
@@ -56,23 +57,12 @@ impl<UART: Read + Write + ErrorType> MT3339<UART> {
                         self.buf_idx += 1;
 
                         if *b == LINE_FEED {
-                            match from_utf8(&self.buf[..self.buf_idx]) {
-                                Ok(msg) => {
-                                    let csum = u8::from_str_radix(&msg[self.buf_idx - 4..self.buf_idx - 2], 16).unwrap().to_be_bytes()[0];
-                                    let data_fields = &msg[1..self.buf_idx - 5];
-
-                                    if generate_checksum(data_fields.as_bytes()) != csum {
-                                        error!("checksum error");
-                                    }
-                                    info!("msg: {:?}", msg);
-                                    self.buf = [0; 255];
-                                    self.buf_idx = 0;
-                                    // TODO return Some(Cmd)
-                                }
-                                Err(_) => {
-                                    error!("failed to convert buffer to utf8 :(")
-                                }
-                            }
+                            // TOOD i don't think this handles PMTKCHN sentences
+                            let mut nmea = Nmea::default();
+                            nmea.parse(from_utf8(&self.buf[..self.buf_idx]).unwrap()).unwrap();
+                            info!("{}", nmea);
+                            self.buf = [0; 255];
+                            self.buf_idx = 0;
                         }
                     });
                 }

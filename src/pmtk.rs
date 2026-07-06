@@ -3,6 +3,10 @@ use defmt::Format;
 use heapless::{format, String};
 use crate::pmtk::PmtkError::InvalidInput;
 
+// TODO can I do this without String?
+
+const MTK_NMEA_PACKET_LEN: usize = 255;
+
 #[derive(Debug)]
 pub enum PmtkError {
     InvalidInput
