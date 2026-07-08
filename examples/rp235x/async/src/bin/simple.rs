@@ -34,6 +34,7 @@ async fn main(_spawner: Spawner) {
 
     let mut gps = MT3339::new(uart);
 
+    // Turn on the basic GGA and RMC info (what you typically want)
     let mut cmd = SetNmeaOutput::default();
     cmd.gll = FrequencySetting::OnePositionFix;
     cmd.rmc = FrequencySetting::OnePositionFix;
@@ -42,12 +43,9 @@ async fn main(_spawner: Spawner) {
     cmd.gsa = FrequencySetting::OnePositionFix;
     cmd.gsv = FrequencySetting::FivePositionFixes;
     gps.send_cmd(cmd).await.ok();
-    // Turn on the basic GGA and RMC info (what you typically want)
-    //gps.send_cmd("PMTK314,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0".as_bytes()).await.unwrap();
     // Set update rate to once a second (1hz) which is what you typically want.
     let cmd = SetNmeaUpdateRate::new(1000).unwrap();
     gps.send_cmd(cmd).await.ok();
-    //gps.send_cmd("PMTK220,1000".as_bytes()).await.unwrap();
 
     loop {
         gps.read_sentence().await.unwrap();

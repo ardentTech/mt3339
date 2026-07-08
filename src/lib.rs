@@ -5,13 +5,9 @@ use core::fmt::Debug;
 use core::str::from_utf8;
 use defmt::{debug, error, info, Format};
 use embedded_io_async::{ErrorType, Read, Write};
-use heapless::format;
 use nmea::Nmea;
-use crate::pmtk::{generate_checksum, NmeaPacket, PmtkCommand};
+use crate::pmtk::PmtkCommand;
 
-const PREAMBLE: u8 = 0x24; // &, 36
-const DATA_FIELD_TERMINATOR: u8 = 0x2a; // *, 42
-const CARRIAGE_RETURN: u8 = 0x0d; // \r, 13
 const LINE_FEED: u8 = 0x0a; // \n, 10
 const MAX_PACKET_LEN: usize = 255;
 
@@ -36,10 +32,7 @@ impl<UART: Read + Write + ErrorType> MT3339<UART> {
     pub async fn send_cmd<const N: usize, C: Into<PmtkCommand<N>> + Format>(&mut self, cmd: C) -> Result<(), MT3339Error<UART::Error>> {
         debug!("MT3339.send_cmd(): {:?}", cmd);
         let pmtk_command: PmtkCommand<N> = cmd.into();
-        let nmea_packet = NmeaPacket { pmtk_command };
-        // TODO should probably use 255 and then trim before as bytes (or remove null bytes?)
-        let s = format!(51; "{}", nmea_packet).unwrap();
-        self.write(s.as_bytes()).await
+        self.write(pmtk_command.serialize().as_bytes()).await
     }
 
     pub async fn read_sentence(&mut self) -> Result<(), MT3339Error<UART::Error>> {
